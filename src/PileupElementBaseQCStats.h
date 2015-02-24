@@ -77,7 +77,7 @@ private:
     static int ourMinMapQuality;
     static IFILE ourOutputFile;
     static bool ourPercentStats;
-    static const int Q20_CHAR_VAL = 53;
+    static const int Q30_CHAR_VAL = 63;
     static const int E9_CALC = 1000000000;
     static const int E6_CALC = 1000000;
 
@@ -95,12 +95,12 @@ private:
     static RunningStat avgAvgMapQ;
     static RunningStat avgAvgMapQCount;
     static RunningStat avgDepth;
-    static RunningStat avgQ20;
+    static RunningStat avgQ30;
 
     static bool ourBaseSum;
 
     int numEntries;
-    int numQ20;
+    int numQ30;
     int depth;
     int numDups;
     int numReads;

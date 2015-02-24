@@ -23,6 +23,9 @@
 #include "PileupElementBaseQCStats.h"
 #include "SamFlag.h"
 
+#define __STDC_FORMAT_MACROS
+#include <inttypes.h>
+
 /////////////////////////////////////////////////////////////////////////////
 //
 // PileupElementBaseQCStats
@@ -46,7 +49,7 @@ RunningStat PileupElementBaseQCStats::avgMapQPass;
 RunningStat PileupElementBaseQCStats::avgAvgMapQ;
 RunningStat PileupElementBaseQCStats::avgAvgMapQCount;
 RunningStat PileupElementBaseQCStats::avgDepth;
-RunningStat PileupElementBaseQCStats::avgQ20;
+RunningStat PileupElementBaseQCStats::avgQ30;
 bool PileupElementBaseQCStats::ourBaseSum = false;
 
 void PileupElementBaseQCStats::filterDups(bool filterDups)
@@ -73,12 +76,12 @@ void PileupElementBaseQCStats::printHeader()
 {
     if(ourPercentStats)
     {
-        ifprintf(ourOutputFile, "chrom\tchromStart\tchromEnd\tDepth\tQ20Bases\tQ20BasesPct(%)\tTotalReads\tMappedBases\tMappingRate(%)\tMapRate_MQPass(%)\tZeroMapQual(%)\tMapQual<10(%)\tPairedReads(%)\tProperPaired(%)\tDupRate(%)\tQCFailRate(%)\tAverageMapQuality\tAverageMapQualCount\n");
-        //    ifprintf(ourOutputFile, "chrom\tchromStart\tchromEnd\tDepth\tQ20Bases(e9)\tQ20BasesPct(%)\tTotalReads(e6)\tMappedBases(e9)\tMappingRate(%)\tMapRate_MQPass(%)\tZeroMapQual(%)\tMapQual<10(%)\tPairedReads(%)\tProperPaired(%)\tDupRate(%)\tQCFailRate(%)\tAverageMapQuality\tAverageMapQualCount(e9)\n");
+        ifprintf(ourOutputFile, "chrom\tchromStart\tchromEnd\tDepth\tQ30Bases\tQ30BasesPct(%)\tTotalReads\tMappedBases\tMappingRate(%)\tMapRate_MQPass(%)\tZeroMapQual(%)\tMapQual<10(%)\tPairedReads(%)\tProperPaired(%)\tDupRate(%)\tQCFailRate(%)\tAverageMapQuality\tAverageMapQualCount\n");
+        //    ifprintf(ourOutputFile, "chrom\tchromStart\tchromEnd\tDepth\tQ30Bases(e9)\tQ30BasesPct(%)\tTotalReads(e6)\tMappedBases(e9)\tMappingRate(%)\tMapRate_MQPass(%)\tZeroMapQual(%)\tMapQual<10(%)\tPairedReads(%)\tProperPaired(%)\tDupRate(%)\tQCFailRate(%)\tAverageMapQuality\tAverageMapQualCount(e9)\n");
     }
     else
     {
-        ifprintf(ourOutputFile, "chrom\tchromStart\tchromEnd\tTotalReads\tDups\tQCFail\tMapped\tPaired\tProperPaired\tZeroMapQual\tMapQual<10\tMapQual255\tPassMapQual\tAverageMapQuality\tAverageMapQualCount\tDepth\tQ20Bases\n");
+        ifprintf(ourOutputFile, "chrom\tchromStart\tchromEnd\tTotalReads\tDups\tQCFail\tMapped\tPaired\tProperPaired\tZeroMapQual\tMapQual<10\tMapQual255\tPassMapQual\tAverageMapQuality\tAverageMapQualCount\tDepth\tQ30Bases\n");
     }
 }
 
@@ -99,7 +102,7 @@ void PileupElementBaseQCStats::printSummary()
 {
     if(ourBaseSum)
     {
-        fprintf(stderr, "\nSummary of Pileup Stats (1st Row is Mean, 2nd Row is Standard Deviation)\nTotalReads\tDups\tQCFail\tMapped\tPaired\tProperPaired\tZeroMapQual\tMapQual<10\tMapQual255\tPassMapQual\tAverageMapQuality\tAverageMapQualCount\tDepth\tQ20Bases\n");
+        fprintf(stderr, "\nSummary of Pileup Stats (1st Row is Mean, 2nd Row is Standard Deviation)\nTotalReads\tDups\tQCFail\tMapped\tPaired\tProperPaired\tZeroMapQual\tMapQual<10\tMapQual255\tPassMapQual\tAverageMapQuality\tAverageMapQualCount\tDepth\tQ30Bases\n");
         
         fprintf(stderr, 
                  "%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n",
@@ -107,14 +110,17 @@ void PileupElementBaseQCStats::printSummary()
                  avgMapped.Mean(), avgPaired.Mean(), avgProperPaired.Mean(),
                  avgZeroMapQ.Mean(), avgLT10MapQ.Mean(), avgMapQ255.Mean(), 
                  avgMapQPass.Mean(), avgAvgMapQ.Mean(), avgAvgMapQCount.Mean(),
-                 avgDepth.Mean(), avgQ20.Mean());
+                 avgDepth.Mean(), avgQ30.Mean());
         fprintf(stderr, 
                  "%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n\n",
                  avgTotalReads.StandardDeviation(), avgDups.StandardDeviation(), avgQCFail.StandardDeviation(),
                  avgMapped.StandardDeviation(), avgPaired.StandardDeviation(), avgProperPaired.StandardDeviation(),
                  avgZeroMapQ.StandardDeviation(), avgLT10MapQ.StandardDeviation(), avgMapQ255.StandardDeviation(), 
                  avgMapQPass.StandardDeviation(), avgAvgMapQ.StandardDeviation(), avgAvgMapQCount.StandardDeviation(),
-                 avgDepth.StandardDeviation(), avgQ20.StandardDeviation());
+                 avgDepth.StandardDeviation(), avgQ30.StandardDeviation());
+        fprintf(stderr, 
+                 "Total number of Q30 bases = %" PRIu64 "\n",
+                 avgQ30.Sum());
     }
 }
 
@@ -243,7 +249,7 @@ void PileupElementBaseQCStats::addEntry(SamRecord& record)
         return;
     }
 
-    // Skip deletion for q20/depth since it does not have a base quality.
+    // Skip deletion for q30/depth since it does not have a base quality.
     if(readIndex == CigarRoller::INDEX_NA)
     {
         // filtered read, so do no more analysis on it.
@@ -252,11 +258,11 @@ void PileupElementBaseQCStats::addEntry(SamRecord& record)
 
     ++depth;
  
-    // Check for Q20 base.
-    if(record.getQuality(readIndex) >= Q20_CHAR_VAL)
+    // Check for Q30 base.
+    if(record.getQuality(readIndex) >= Q30_CHAR_VAL)
     {
-        // Greater than or equal to q20.
-        ++numQ20;
+        // Greater than or equal to q30.
+        ++numQ30;
     }    
 }
 
@@ -280,8 +286,8 @@ void PileupElementBaseQCStats::analyze()
             myOutputString += "\t";
             myOutputString += depth;
             myOutputString += "\t";
-            myOutputString += numQ20;
-            //        myOutputString += (double(numQ20))/E9_CALC;
+            myOutputString += numQ30;
+            //        myOutputString += (double(numQ30))/E9_CALC;
             myOutputString += "\t";
             if(depth == 0)
             {
@@ -289,7 +295,7 @@ void PileupElementBaseQCStats::analyze()
             }
             else
             {
-                myOutputString += 100 * (double(numQ20))/depth;
+                myOutputString += 100 * (double(numQ30))/depth;
             }
             myOutputString += "\t";
             myOutputString += numEntries;
@@ -380,7 +386,7 @@ void PileupElementBaseQCStats::analyze()
             myOutputString += "\t";
             myOutputString += depth;
             myOutputString += "\t";
-            myOutputString += numQ20;
+            myOutputString += numQ30;
             myOutputString += "\n";
         
             ifprintf(ourOutputFile, myOutputString.c_str());
@@ -402,7 +408,7 @@ void PileupElementBaseQCStats::analyze()
             avgAvgMapQ.Push( ((double)sumMapQ)/averageMapQCount);
             avgAvgMapQCount.Push(averageMapQCount);
             avgDepth.Push(depth);
-            avgQ20.Push(numQ20);
+            avgQ30.Push(numQ30);
         }
     }
 }
@@ -420,7 +426,7 @@ void PileupElementBaseQCStats::reset(int32_t refPosition)
 void PileupElementBaseQCStats::initVars()
 {
     numEntries = 0;
-    numQ20 = 0;
+    numQ30 = 0;
     depth = 0;
     numDups = 0;
     numReads = 0;
